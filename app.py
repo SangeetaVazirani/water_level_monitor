@@ -1,4 +1,4 @@
-```python
+
 import streamlit as st
 import requests
 from streamlit_autorefresh import st_autorefresh
