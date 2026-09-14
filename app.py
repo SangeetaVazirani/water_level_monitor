@@ -1,6 +1,5 @@
 import streamlit as st
 import requests
-from datetime import datetime
 
 st.set_page_config(
     page_title="Water Level Monitor",
@@ -13,142 +12,64 @@ st.set_page_config(
 # -----------------------------
 CHANNEL_ID = "3492220"
 
-# ThingSpeak READ API KEY
+# Paste your ThingSpeak READ API KEY here
 READ_API_KEY = "G4GHE1YDS9W41SYP"
 
 # -----------------------------
-# Dashboard title
+# Get latest data
 # -----------------------------
-st.title("💧 Water Level Monitoring System")
-st.write("ESP32 → ThingSpeak → Streamlit")
+url = f"https://api.thingspeak.com/channels/{CHANNEL_ID}/feeds/last.json"
 
-st.divider()
+params = {
+    "api_key": READ_API_KEY
+}
 
+try:
+    response = requests.get(url, params=params, timeout=5)
 
-# -----------------------------
-# Automatically refresh dashboard
-# -----------------------------
-@st.fragment(run_every=3)
-def water_level_dashboard():
+    if response.status_code == 200:
+        data = response.json()
 
-    # -----------------------------
-    # Get latest ThingSpeak data
-    # -----------------------------
-    url = f"https://api.thingspeak.com/channels/{CHANNEL_ID}/feeds/last.json"
+        level = int(float(data["field1"]))
+        led1 = int(float(data["field2"]))
+        led2 = int(float(data["field3"]))
+        buzzer = int(float(data["field4"]))
 
-    params = {
-        "api_key": READ_API_KEY
-    }
+        # -----------------------------
+        # Dashboard
+        # -----------------------------
+        st.title("💧 Water Level Monitoring System")
+        st.write("ESP32 → ThingSpeak → Streamlit")
 
-    try:
-        response = requests.get(
-            url,
-            params=params,
-            timeout=5
-        )
+        st.divider()
 
-        if response.status_code == 200:
+        col1, col2, col3, col4 = st.columns(4)
 
-            data = response.json()
+        with col1:
+            st.metric("Water Level", f"{level}%")
 
-            # Check that data exists
-            if data.get("field1") is None:
-                st.error("No water level data received from ThingSpeak.")
-                return
+        with col2:
+            st.metric("LED 1", "ON" if led1 == 1 else "OFF")
 
-            # -----------------------------
-            # Read fields
-            # -----------------------------
-            level = int(float(data["field1"]))
-            led1 = int(float(data["field2"]))
-            led2 = int(float(data["field3"]))
-            buzzer = int(float(data["field4"]))
+        with col3:
+            st.metric("LED 2", "ON" if led2 == 1 else "OFF")
 
-            # -----------------------------
-            # Display values
-            # -----------------------------
-            col1, col2, col3, col4 = st.columns(4)
+        with col4:
+            st.metric("Buzzer", "ON" if buzzer == 1 else "OFF")
 
-            with col1:
-                st.metric(
-                    "💧 Water Level",
-                    f"{level}%"
-                )
+        st.divider()
 
-            with col2:
-                st.metric(
-                    "🔴 LED 1",
-                    "ON" if led1 == 1 else "OFF"
-                )
-
-            with col3:
-                st.metric(
-                    "🔴 LED 2",
-                    "ON" if led2 == 1 else "OFF"
-                )
-
-            with col4:
-                st.metric(
-                    "🔊 Buzzer",
-                    "ON" if buzzer == 1 else "OFF"
-                )
-
-            st.divider()
-
-            # -----------------------------
-            # Water level message
-            # -----------------------------
-            if level == 0:
-
-                st.info(
-                    "⚪ Water Level: 0% — System Idle"
-                )
-
-            elif level == 50:
-
-                st.success(
-                    "🟢 Water Level: 50% — Normal Level"
-                )
-
-            elif level == 100:
-
-                st.warning(
-                    "🟠 Water Level: 100% — HIGH LEVEL / ALARM"
-                )
-
-            else:
-
-                st.info(
-                    f"Water Level: {level}%"
-                )
-
-            # -----------------------------
-            # ThingSpeak update time
-            # -----------------------------
-            st.caption(
-                f"Last ThingSpeak update: "
-                f"{data.get('created_at', 'Unknown')}"
-            )
-
-            # -----------------------------
-            # Dashboard refresh information
-            # -----------------------------
-            st.caption(
-                "🔄 Dashboard automatically checks ThingSpeak every 3 seconds."
-            )
-
+        if level == 50:
+            st.success("🟢 Water Level: 50% — Normal Level")
+        elif level == 100:
+            st.warning("🟠 Water Level: 100% — HIGH LEVEL / ALARM")
         else:
+            st.info(f"Water Level: {level}%")
 
-            st.error(
-                f"ThingSpeak error: HTTP {response.status_code}"
-            )
+        st.caption(f"Last update received from ThingSpeak: {data.get('created_at', 'Unknown')}")
 
-    except Exception as e:
+    else:
+        st.error(f"ThingSpeak error: HTTP {response.status_code}")
 
-        st.error(
-            f"Unable to connect to ThingSpeak: {e}"
-        )
-
-
-# Run dashboard
-water_level_dashboard()
+except Exception as e:
+    st.error(f"Unable to connect to ThingSpeak: {e}")
